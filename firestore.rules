@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated
+    function isAuthenticated() {
+       return request.auth != null;
+    }
+
+    // Check if user owns the resource (for user-owned documents)
+    function isOwner(userId) {
+       return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if user is owner based on document's userId field
+    function isDocOwner() {
+       return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    // Verify UID hasn't been tampered with on create
+    function uidUnchanged() {
+       return !('userId' in request.resource.data) ||
+         request.resource.data.userId == request.auth.uid;
+    }
+
+    // Ensure userId field is not modified on update
+    function uidNotModified() {
+       return !('userId' in request.resource.data) ||
+         request.resource.data.userId == resource.data.userId;
+    }
+
+    // Validate required fields exist
+    function hasRequiredFields(fields) {
+       return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate string length
+    function validStringLength(field, minLen, maxLen) {
+       return request.resource.data[field] is string &&
+         request.resource.data[field].size() >= minLen &&
+         request.resource.data[field].size() <= maxLen;
+    }
+
+    // Validate email format
+    function isValidEmail(email) {
+       return email is string &&
+         email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Validate ISO 8601 date string format (YYYY-MM-DDTHH:MM:SS)
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // Validate that the document contains only the allowed fields
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUserProfile(data) {
+      return hasOnlyAllowedFields(['name', 'email', 'joinedDate', 'avatarUrl', 'selfReportedSkinType', 'medicalProfile', 'watchlist', 'shelf', 'cycleTracker']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.joinedDate is string && isValidDateString(data.joinedDate) &&
+             (!('avatarUrl' in data) || (data.avatarUrl is string && data.avatarUrl.size() < 500)) &&
+             (!('selfReportedSkinType' in data) || (data.selfReportedSkinType is string && data.selfReportedSkinType.size() < 50)) &&
+             (!('medicalProfile' in data) || (data.medicalProfile is map)) && // Validate map structure if possible
+             (!('watchlist' in data) || (data.watchlist is list && data.watchlist.size() < 50)) &&
+             (!('shelf' in data) || (data.shelf is list && data.shelf.size() < 50)) &&
+             (!('cycleTracker' in data) || (data.cycleTracker is map));
+    }
+
+    function isValidScan(data) {
+      return hasOnlyAllowedFields(['userId', 'date', 'timestamp', 'score', 'imageBase64', 'analysis']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.date is string && isValidDateString(data.date) &&
+             data.timestamp is number && data.timestamp > 0 &&
+             data.score is number && data.score >= 0 && data.score <= 100 &&
+             data.imageBase64 is string && data.imageBase64.size() < 1048576 && // Limit image size (1MB approx)
+             data.analysis is map; // Validate analysis structure if possible
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    match /scans/{scanId} {
+      allow read: if isDocOwner(); // Check userId field on the document
+      allow create: if isAuthenticated() && isValidScan(request.resource.data) && uidUnchanged();
+      allow update: if isDocOwner() && isValidScan(request.resource.data) && uidNotModified();
+      allow delete: if isDocOwner();
+    }
+  }
+}

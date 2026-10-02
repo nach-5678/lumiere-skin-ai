@@ -1,0 +1,8 @@
+{
+  "name": "Lumière Skin AI",
+  "description": "An AI-powered virtual dermatologist that analyzes your skin health and provides personalized, healing-focused skincare routines.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

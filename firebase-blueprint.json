@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user profile information, including skin type, medical profile, and watchlist.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "User's full name" },
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "joinedDate": { "type": "string", "format": "date-time", "description": "Date when the user joined" },
+        "avatarUrl": { "type": "string", "description": "URL to the user's avatar image" },
+        "selfReportedSkinType": { "type": "string", "description": "User's self-reported skin type" },
+        "medicalProfile": { "type": "object", "description": "User's medical profile (allergies, pregnancy, etc.)" },
+        "watchlist": { "type": "array", "description": "List of tracked spots" },
+        "shelf": { "type": "array", "description": "List of skincare products on the user's shelf" },
+        "cycleTracker": { "type": "object", "description": "User's menstrual cycle tracking data" }
+      },
+      "required": ["name", "email", "joinedDate"]
+    },
+    "Scan": {
+      "title": "Skin Scan",
+      "description": "Stores the results of a skin analysis scan.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the user who performed the scan" },
+        "date": { "type": "string", "format": "date-time", "description": "Date of the scan" },
+        "timestamp": { "type": "number", "description": "Timestamp of the scan" },
+        "score": { "type": "number", "description": "Overall skin health score" },
+        "imageBase64": { "type": "string", "description": "Base64 encoded image of the scan" },
+        "analysis": { "type": "object", "description": "Detailed analysis results" }
+      },
+      "required": ["userId", "date", "timestamp", "score", "imageBase64", "analysis"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles, keyed by user ID."
+    },
+    "scans/{scanId}": {
+      "schema": "Scan",
+      "description": "Collection of skin scans."
+    }
+  }
+}
